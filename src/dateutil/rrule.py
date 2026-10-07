@@ -17,7 +17,7 @@ from warnings import warn
 
 from six import advance_iterator, integer_types
 
-from six.moves import _thread, range
+from six.moves import _thread, copyreg, range
 
 from ._common import weekday as weekdaybase
 
@@ -101,6 +101,31 @@ class rrulebase(object):
             self._cache = None
             self._cache_complete = False
             self._len = None
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state.pop("_cache_lock", None)
+        state.pop("_cache_gen", None)
+        if state["_cache"] is not None and not state["_cache_complete"]:
+            # A partial cache cannot be resumed without its generator. Start
+            # fresh rather than serializing a prefix and yielding it twice.
+            state["_cache"] = []
+            state["_len"] = None
+        slots = {}
+        for name in copyreg._slotnames(type(self)):
+            if hasattr(self, name):
+                slots[name] = getattr(self, name)
+        return (state, slots) if slots else state
+
+    def __setstate__(self, state):
+        if isinstance(state, tuple):
+            state, slots = state
+            for name, value in slots.items():
+                setattr(self, name, value)
+        self.__dict__.update(state)
+        if self._cache is not None:
+            self._cache_lock = _thread.allocate_lock()
+            self._cache_gen = None if self._cache_complete else self._iter()
 
     def __iter__(self):
         if self._cache_complete:
