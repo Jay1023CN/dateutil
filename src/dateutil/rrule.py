@@ -106,11 +106,11 @@ class rrulebase(object):
         state = self.__dict__.copy()
         state.pop("_cache_lock", None)
         state.pop("_cache_gen", None)
-        if state["_cache"] is not None and not state["_cache_complete"]:
-            # A partial cache cannot be resumed without its generator. Start
-            # fresh rather than serializing a prefix and yielding it twice.
+        # The cache belongs to this object and can be regenerated on demand.
+        if self._cache is not None:
             state["_cache"] = []
             state["_len"] = None
+            state["_cache_complete"] = False
         slots = {}
         for name in copyreg._slotnames(type(self)):
             if hasattr(self, name):
